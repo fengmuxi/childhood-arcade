@@ -16,8 +16,6 @@
 ![stack](https://img.shields.io/badge/stack-Vue%203%20·%20Hono%20·%20SQLite-6366F1)
 ![vibe](https://img.shields.io/badge/vibe-modern%20slate%20·%20indigo-6366F1)
 
-示例网站：https://game.520hello.cn/
-
 在自家服务器 / NAS 上开一间童年游戏厅——**街机 / FC / SFC / GB / GBA / MD / PS1** 一条龙，浏览器直接开玩，多端云存档，WebRTC 一键开房和朋友对战。底层 libretro，不装客户端。
 
 ---
@@ -53,23 +51,106 @@
 
 ---
 
-## 🚀 快速上手
+## 🚀 部署
+
+### 本地部署
+
+适合二次开发、源码运行或直接在服务器上用 Node.js 托管。
+
+**环境要求**
+
+- Node.js 24+
+- npm
 
 ```bash
-# 开发
+# 1. 安装依赖
 npm install
-npm run dev      # API :3000 · Web :5173（代理 /api）
 
-# 生产
-npm ci --omit=dev
-npm run build
-npm start        # :3000 同端口跑 HTTP + WebSocket
-
-# Docker
-docker compose up -d --build
+# 2. 开发模式
+npm run dev
 ```
 
+开发模式默认启动：
+
+- API：`http://localhost:3000`
+- Web：`http://localhost:5173`（已代理 `/api`）
+
+生产运行：
+
+```bash
+# 1. 安装依赖
+npm ci
+
+# 2. 构建前端
+npm run build
+
+# 3. 可选：裁剪为生产依赖
+npm prune --omit=dev
+
+# 4. 启动服务
+npm start
+```
+
+生产模式默认访问：`http://localhost:3000`
+
 仓库已在 `data/cores/` + `data/bios/` 预置全部核心 + 街机 / FDS BIOS，无需额外下载。PSX BIOS 需自备放入 `data/bios/psx/`。
+
+### Docker 部署
+
+镜像地址：[yize8888/childhood-arcade](https://hub.docker.com/r/yize8888/childhood-arcade)
+
+#### docker run
+
+```bash
+docker run -d \
+  --name childhood-arcade \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -v ./data:/data \
+  -e MAX_UPLOAD_BYTES=104857600 \
+  yize8888/childhood-arcade:latest
+```
+
+启动后访问：`http://服务器IP:3000`
+
+#### Docker Compose
+
+```yaml
+services:
+  childhood-arcade:
+    image: yize8888/childhood-arcade:latest
+    container_name: childhood-arcade
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      MAX_UPLOAD_BYTES: "104857600"
+      # 首次启动默认管理员：admin / admin123
+      # 建议首次登录后立即修改密码，或取消下面两行注释自定义初始账号
+      # ADMIN_USERNAME: admin
+      # ADMIN_PASSWORD: your-strong-password
+    volumes:
+      - ./data:/data
+```
+
+启动：
+
+```bash
+docker compose up -d
+```
+
+更新镜像：
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+如果想从源码本地构建镜像：
+
+```bash
+docker compose up -d --build
+```
 
 ### 环境变量（全部可选）
 
