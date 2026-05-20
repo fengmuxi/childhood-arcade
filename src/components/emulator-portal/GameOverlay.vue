@@ -25,6 +25,10 @@
     <button class="bar-btn bar-btn-keys" @click="$emit('keys')" aria-label="按键设置" title="按键设置">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>
     </button>
+    <button v-if="showRotate" class="bar-btn bar-btn-rotate" @click="$emit('rotate')" aria-label="旋转屏幕" title="旋转屏幕">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/><path d="M9 6h6"/></svg>
+      <span class="bar-btn-label">旋转</span>
+    </button>
     <button class="bar-btn bar-btn-show" @click="$emit('toggle-overlay')" aria-label="隐藏控制栏" title="隐藏控制栏 (H)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       <span class="bar-btn-label">收起</span>
@@ -44,13 +48,18 @@ defineProps({
   coreName: String,
   canSave: { type: Boolean, default: true },
 })
-defineEmits(['back', 'fullscreen', 'keys', 'save-state', 'load-state', 'toggle-overlay'])
+defineEmits(['back', 'fullscreen', 'keys', 'save-state', 'load-state', 'toggle-overlay', 'rotate'])
 
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 const canFullscreen = computed(() => {
   const hasFs = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled)
   return hasFs && !isIOS
+})
+const showRotate = computed(() => {
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+  const isPortrait = window.innerHeight > window.innerWidth
+  return isTouch && isPortrait
 })
 </script>
 
@@ -188,6 +197,15 @@ const canFullscreen = computed(() => {
 .bar-btn-show:hover {
   background: rgba(255, 255, 255, 0.24);
   border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+.bar-btn-rotate {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent);
+}
+.bar-btn-rotate:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
   color: #fff;
 }
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="player-page">
+  <div class="player-page" :class="{ 'player-page--rotated': isRotated }">
     <GameOverlay
       v-if="(romMeta || fatalError || isGuestMode) && showOverlay"
       :title="displayName"
@@ -12,6 +12,7 @@
       @save-state="onSaveState"
       @load-state="onLoadState"
       @toggle-overlay="showOverlay = false"
+      @rotate="onRotateHint"
     >
       <template #extras>
         <!-- Version switcher: only when this game has multi-version siblings -->
@@ -116,7 +117,7 @@
     </button>
 
     <Transition name="hint">
-      <div v-if="showRotateHint" class="rotate-hint" @click="showRotateHint = false">
+      <div v-if="showRotateHint" class="rotate-hint" @click="onRotateHint">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/></svg>
         横屏体验更佳
       </div>
@@ -179,6 +180,7 @@ const { isAuthed } = useAuth()
 const portalRef = ref(null)
 const remoteVideoRef = ref(null)
 const showRotateHint = ref(false)
+const isRotated = ref(false)
 const showInput = ref(false)
 const showRoom = ref(false)
 const showOverlay = ref(true)
@@ -462,6 +464,29 @@ function showToast(text) {
   setTimeout(() => { toastText.value = '' }, 1600)
 }
 
+async function onRotateHint() {
+  showRotateHint.value = false
+  // If already rotated, unlock orientation and restore
+  // if (isRotated.value) {
+  //   isRotated.value = false
+  //   if (screen.orientation?.unlock) {
+  //     try { screen.orientation.unlock() } catch {}
+  //   }
+  //   return
+  // }
+  // Try Screen Orientation API first (Chrome on Android, etc.)
+  // if (screen.orientation?.lock) {
+  //   try {
+  //     await screen.orientation.lock('landscape')
+  //     return
+  //   } catch {
+  //     // Fall through to CSS rotation
+  //   }
+  // }
+  // Fallback: rotate the entire page content via CSS
+  // isRotated.value = true
+}
+
 function onKeyDown(e) {
   if (e.key === 'Escape' && !document.fullscreenElement) goBack()
   if (e.key.toLowerCase() === 'h' && (rom.value || fatalError.value || isGuestMode.value)) {
@@ -690,7 +715,7 @@ watch(() => props.id, (now, prev) => {
 onMounted(() => {
   if (window.innerWidth < 768 && window.innerHeight > window.innerWidth) {
     showRotateHint.value = true
-    setTimeout(() => { showRotateHint.value = false }, 3500)
+    setTimeout(() => { showRotateHint.value = false }, 6000)
   }
   document.addEventListener('keydown', onKeyDown)
   loadMeta()
@@ -729,6 +754,16 @@ onBeforeUnmount(() => {
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+}
+/* CSS landscape rotation for devices that don't support Screen Orientation API */
+.player-page--rotated {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vh;
+  height: 100vw;
+  /* Center and rotate to fill screen in landscape */
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
 }
 .player-page :deep(.portal-canvas) {
   -webkit-user-select: none;
