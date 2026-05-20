@@ -109,6 +109,7 @@
           v-if="(rom && !isGuestMode) || (isGuestMode && canGuestPlay)"
           :platform="romMeta?.platform"
           :on-button="guestButtonInterceptor"
+          :landscape="isRotated"
         />
       </div>
       </div><!-- /.emu-area-inner -->

@@ -1,5 +1,5 @@
 <template>
-  <div v-if="enabled" class="vpad" :class="{ 'vpad-landscape': landscape }">
+  <div v-if="enabled" class="vpad" :class="{ 'vpad-landscape': isLandscape }">
     <!-- Left: virtual analog stick — supports diagonals by finger position -->
     <div class="vpad-group vpad-left">
       <div
@@ -22,10 +22,10 @@
       </div>
     </div>
 
-    <!-- Center: Start / Select — container-level pointer tracking so a finger
-         can slide between SELECT/START without re-tapping (MOBA-style). -->
+    <!-- Center: Start / Select — in landscape mode, move to bottom as a row -->
     <div
       class="vpad-group vpad-center"
+      :class="{ 'vpad-center-landscape': isLandscape }"
       @pointerdown.prevent="onBtnPointerDown"
       @pointermove.prevent="onBtnPointerMove"
       @pointerup.prevent="onBtnPointerUp"
@@ -89,9 +89,8 @@ import { useInputMapping } from '../../composables/useInputMapping.js'
 
 const props = defineProps({
   platform: { type: String, default: null },
-  // Optional callback: guest mode forwards the button over the DataChannel
-  // instead of dispatching a local key. Return true to swallow the default.
   onButton: { type: Function, default: null },
+  landscape: { type: Boolean, default: false },
 })
 
 const { mapping } = useInputMapping()
@@ -109,8 +108,10 @@ function onResize() { narrow.value = window.innerWidth < 900 }
 onMounted(() => window.addEventListener('resize', onResize))
 onBeforeUnmount(() => window.removeEventListener('resize', onResize))
 
-const landscape = computed(() =>
-  typeof window !== 'undefined' && window.innerWidth > window.innerHeight,
+// Use prop from parent — window dimensions don't change with CSS rotation
+const isLandscape = computed(() =>
+  props.landscape ||
+  (typeof window !== 'undefined' && window.innerWidth > window.innerHeight),
 )
 
 const enabled = computed(() => hasTouch && narrow.value)
@@ -375,6 +376,22 @@ function processPointer(e) {
   const cy = rect.top + rect.height / 2
   let dx = e.clientX - cx
   let dy = e.clientY - cy
+
+  // When CSS rotation is applied (landscape rotation), the stick element is
+  // visually rotated. Touch coordinates are in screen space, so we must
+  // un-rotate the delta by the same angle to get the correct logical direction.
+  const rotation = getElementRotation(el)
+  if (rotation !== 0) {
+    const rad = rotation * Math.PI / 180
+    const cos = Math.cos(rad)
+    const sin = Math.sin(rad)
+    // Rotate the delta backwards to undo the CSS transform
+    const newDx = dx * cos + dy * sin
+    const newDy = -dx * sin + dy * cos
+    dx = newDx
+    dy = newDy
+  }
+
   const r = Math.min(rect.width, rect.height) / 2
   const dist = Math.hypot(dx, dy)
   // Clamp knob position to the stick radius so it never leaves the base.
@@ -399,6 +416,28 @@ function processPointer(e) {
     else                                 { dirs.add('right'); dirs.add('up') }
   }
   return { dirs, knobX: dx, knobY: dy }
+}
+
+// Detect CSS rotation angle applied to an element (or any ancestor).
+// Returns the total rotation in degrees (e.g. 90, -90, 180, 0).
+function getElementRotation(el) {
+  let current = el
+  while (current && current !== document.body) {
+    const style = getComputedStyle(current)
+    const transform = style.transform || style.webkitTransform || ''
+    if (transform && transform !== 'none') {
+      // Parse matrix: matrix(a, b, c, d, tx, ty) or matrix3d(...)
+      const matrixMatch = transform.match(/matrix\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)/)
+      if (matrixMatch) {
+        const a = parseFloat(matrixMatch[1])
+        const b = parseFloat(matrixMatch[2])
+        const angle = Math.round(Math.atan2(b, a) * 180 / Math.PI)
+        if (angle !== 0) return angle
+      }
+    }
+    current = current.parentElement
+  }
+  return 0
 }
 
 function applyDirs(wanted) {
@@ -458,6 +497,16 @@ function onDpadEnd(e) {
 .vpad-left  { justify-content: flex-start; }
 .vpad-right { justify-content: flex-end; flex-direction: column; gap: 10px; align-items: flex-end; }
 .vpad-center { flex-direction: column; gap: 8px; justify-content: flex-end; padding-bottom: 14px; touch-action: none; }
+/* In landscape mode, center buttons become a horizontal row at the bottom */
+.vpad-group.vpad-center-landscape {
+  position: relative;
+  left: auto; right: auto; bottom: auto;
+  transform: none;
+  flex-direction: row !important;
+  gap: 12px;
+  justify-content: center;
+  padding: 4px 0 calc(10px + env(safe-area-inset-bottom));
+}
 
 /* MOBA-style pointer surface — face + shoulders share one capture area so
    a finger can slide between any button without needing to lift. */
@@ -728,7 +777,7 @@ function onDpadEnd(e) {
   .face-md .face-btn { width: 42px; height: 42px; font-size: 13px; }
 }
 
-/* Landscape: push stick / face buttons toward corners */
+/* Landscape: push stick / face buttons toward corners, center buttons to bottom row */
 @media (orientation: landscape) and (max-height: 500px) {
   .vpad {
     padding:
@@ -737,7 +786,6 @@ function onDpadEnd(e) {
       calc(8px + env(safe-area-inset-bottom))
       calc(12px + env(safe-area-inset-left));
   }
-  .vpad-center { padding-bottom: 8px; flex-direction: row; }
   .stick, .face { width: 128px; height: 128px; }
   .face-md { width: 162px; height: 106px; }
   .face-sms { width: 122px; height: 60px; }
