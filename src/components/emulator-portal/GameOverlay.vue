@@ -59,7 +59,7 @@ const canFullscreen = computed(() => {
 const showRotate = computed(() => {
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
   const isPortrait = window.innerHeight > window.innerWidth
-  return isTouch && isPortrait
+  return isTouch && isPortrait && !document.fullscreenElement
 })
 </script>
 

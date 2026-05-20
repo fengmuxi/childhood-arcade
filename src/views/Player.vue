@@ -467,11 +467,13 @@ async function onFullscreen() {
 
   // For mobile: use CSS rotation as the primary landscape approach
   // (Screen Orientation API lock is unreliable during fullscreen transitions)
+  // NOTE: Do NOT auto-rotate on fullscreen — let the browser handle orientation
+  // naturally. Fullscreen mode manages its own viewport.
   if (window.innerWidth < 768) {
     isRotated.value = true
     // Still try API lock as a bonus (may work on some Android browsers)
     if (screen.orientation?.lock) {
-      screen.orientation.lock('landscape').catch(() => {})
+      screen.orientation.lock('landscape').catch(() => { })
     }
   }
 
@@ -487,13 +489,7 @@ async function onFullscreen() {
 let relockTimer = null
 function onFullscreenChange() {
   if (relockTimer) { clearTimeout(relockTimer); relockTimer = null }
-  if (document.fullscreenElement && screen.orientation?.lock && window.innerWidth < 768) {
-    // Re-attempt lock after fullscreen settles (belt-and-suspenders)
-    relockTimer = setTimeout(() => {
-      if (!document.fullscreenElement) return
-      screen.orientation.lock('landscape').catch(() => {})
-    }, 200)
-  } else if (!document.fullscreenElement) {
+  if (!document.fullscreenElement) {
     // Exited fullscreen — clear rotation
     isRotated.value = false
   }
@@ -812,6 +808,10 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: 1;
 }
+/* In fullscreen, overflow is visible so rotated content isn't clipped */
+.emu-area:fullscreen {
+  overflow: visible;
+}
 .emu-area-inner {
   flex: 1;
   display: flex;
@@ -820,26 +820,21 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: hidden;
 }
-/* CSS landscape rotation for devices that don't support Screen Orientation API */
+/* When rotated, let children overflow since they fill the rotated viewport */
 .emu-area-inner--rotated {
   position: absolute;
-  /* Swap dimensions: make width = container height, height = container width */
   width: 100vh;
   height: 100vw;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%) rotate(90deg);
   transform-origin: center center;
   z-index: 999;
+  overflow: visible;
 }
-/* When in fullscreen, vh/vw match the fullscreen container dimensions */
-.emu-area-inner--rotated:fullscreen,
-.emu-area-inner--rotated:-webkit-full-screen {
-  position: absolute !important;
-  width: 100vh !important;
-  height: 100vw !important;
-  top: 50% !important; left: 50% !important;
-  transform: translate(-50%, -50%) rotate(90deg) !important;
-  transform-origin: center center !important;
+/* In fullscreen, the parent container fills the screen so vh/vw = screen dims */
+.emu-area:fullscreen,
+.emu-area:-webkit-full-screen {
+  overflow: visible !important;
 }
 .emu-frame { flex: 1; width: 100%; min-height: 0; position: relative; overflow: hidden; }
 
