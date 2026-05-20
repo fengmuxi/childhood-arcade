@@ -2,146 +2,145 @@
   <div class="player-page">
     <div class="emu-area" ref="frameRef">
       <div class="emu-area-inner" :class="{ 'emu-area-inner--rotated': isRotated }">
-      <GameOverlay
-        v-if="(romMeta || fatalError || isGuestMode) && showOverlay"
-        :title="displayName"
-        :platform="platformInfo"
-        :core-name="coreDisplayName[platformInfo.core]"
-        :can-save="isAuthed && !isGuestMode"
-        @back="goBack"
-        @fullscreen="onFullscreen"
-        @keys="showInput = true"
-        @save-state="onSaveState"
-        @load-state="onLoadState"
-        @toggle-overlay="showOverlay = false"
-        @rotate="onRotateHint"
-      >
-        <template #extras>
-          <!-- Version switcher: only when this game has multi-version siblings -->
-          <div v-if="siblings.length > 1" class="ver-switch" @click.stop>
-            <button class="ver-btn" @click="versionMenuOpen = !versionMenuOpen">
-              <span class="ver-cur">{{ currentVersionLabel }}</span>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <GameOverlay
+          v-if="(romMeta || fatalError || isGuestMode) && showOverlay"
+          :title="displayName"
+          :platform="platformInfo"
+          :core-name="coreDisplayName[platformInfo.core]"
+          :can-save="isAuthed && !isGuestMode"
+          @back="goBack"
+          @fullscreen="onFullscreen"
+          @keys="showInput = true"
+          @save-state="onSaveState"
+          @load-state="onLoadState"
+          @toggle-overlay="showOverlay = false"
+          @rotate="onRotateHint"
+        >
+          <template #extras>
+            <!-- Version switcher: only when this game has multi-version siblings -->
+            <div v-if="siblings.length > 1" class="ver-switch" @click.stop>
+              <button class="ver-btn" @click="versionMenuOpen = !versionMenuOpen">
+                <span class="ver-cur">{{ currentVersionLabel }}</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div v-if="versionMenuOpen" class="ver-menu">
+                <button
+                  v-for="v in siblings"
+                  :key="v.id"
+                  class="ver-item"
+                  :class="{ active: v.id === romMeta?.id }"
+                  @click="switchVersion(v)"
+                >{{ v.id === (romMeta?.parentRomId ?? romMeta?.id) ? '原版' : (v.versionLabel || '变体') }}</button>
+              </div>
+            </div>
+
+            <button v-if="isRoomMode" class="room-chip" :class="{ active: showRoom }" @click="showRoom = !showRoom" title="房间">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              <span class="chip-count">{{ Object.keys(signalPeers).length }}</span>
             </button>
-            <div v-if="versionMenuOpen" class="ver-menu">
-              <button
-                v-for="v in siblings"
-                :key="v.id"
-                class="ver-item"
-                :class="{ active: v.id === romMeta?.id }"
-                @click="switchVersion(v)"
-              >{{ v.id === (romMeta?.parentRomId ?? romMeta?.id) ? '原版' : (v.versionLabel || '变体') }}</button>
+          </template>
+        </GameOverlay>
+
+        <div class="emu-frame">
+          <!-- Host / solo: real Nostalgist emulator.
+              Only render when we KNOW we're solo or the host. If we're in a
+              room but role is still unknown (welcome not arrived yet), show
+              the waiting-guest view instead — starting the emulator for a
+              future guest wastes cores + triggers an unmount race. -->
+          <EmulatorPortal
+            v-if="rom && biosReady && (!isRoomMode || isHostMode)"
+            ref="portalRef"
+            :core="platformInfo.core"
+            :rom="rom"
+            :bios="bios"
+            :retroarch-config="retroarchConfig"
+            @booted="onBooted"
+            @error="(err) => { fatalError = err?.message || '模拟器启动失败' }"
+          />
+
+          <!-- Guest (or role not yet determined in a room): remote video stream -->
+          <div v-else-if="isRoomMode" class="guest-view">
+            <video
+              ref="remoteVideoRef"
+              class="remote-video"
+              autoplay
+              playsinline
+              muted
+              @playing="onVideoPlaying"
+            ></video>
+            <!-- Waiting overlay: connecting / no stream yet -->
+            <div v-if="!remoteStreamActive" class="guest-waiting">
+              <div class="spinner"></div>
+              <p>{{ signalMe ? '等待主机画面…' : '正在进入房间…' }}</p>
+              <p class="muted">{{ connectionStatus }}</p>
+            </div>
+            <!-- Mute badge: auto-start is always muted to bypass browser autoplay
+                policy; this chip lets the user opt in to audio with a tap. -->
+            <button v-if="remoteStreamActive && isMuted" class="unmute-chip" @click="unmuteRemote">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/></svg>
+              点击取消静音
+            </button>
+          </div>
+
+          <div v-else-if="fatalError" class="emu-error">
+            <div class="error-card">
+              <p>{{ fatalError }}</p>
+              <button class="btn btn-primary" @click="goBack">返回列表</button>
             </div>
           </div>
 
-          <button v-if="isRoomMode" class="room-chip" :class="{ active: showRoom }" @click="showRoom = !showRoom" title="房间">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-            <span class="chip-count">{{ Object.keys(signalPeers).length }}</span>
-          </button>
-        </template>
-      </GameOverlay>
-
-      <div class="emu-frame">
-        <!-- Host / solo: real Nostalgist emulator.
-             Only render when we KNOW we're solo or the host. If we're in a
-             room but role is still unknown (welcome not arrived yet), show
-             the waiting-guest view instead — starting the emulator for a
-             future guest wastes cores + triggers an unmount race. -->
-        <EmulatorPortal
-          v-if="rom && biosReady && (!isRoomMode || isHostMode)"
-          ref="portalRef"
-          :core="platformInfo.core"
-          :rom="rom"
-          :bios="bios"
-          :retroarch-config="retroarchConfig"
-          @booted="onBooted"
-          @error="(err) => { fatalError = err?.message || '模拟器启动失败' }"
-        />
-
-        <!-- Guest (or role not yet determined in a room): remote video stream -->
-        <div v-else-if="isRoomMode" class="guest-view">
-          <video
-            ref="remoteVideoRef"
-            class="remote-video"
-            autoplay
-            playsinline
-            muted
-            @playing="onVideoPlaying"
-          ></video>
-          <!-- Waiting overlay: connecting / no stream yet -->
-          <div v-if="!remoteStreamActive" class="guest-waiting">
-            <div class="spinner"></div>
-            <p>{{ signalMe ? '等待主机画面…' : '正在进入房间…' }}</p>
-            <p class="muted">{{ connectionStatus }}</p>
+          <div v-else class="emu-loading">
+            <div class="loading-stack">
+              <div class="loading-glow"></div>
+              <div class="spinner"></div>
+            </div>
+            <p class="emu-loading-title">
+              <span class="dot" style="--i:0"></span><span class="dot" style="--i:1"></span><span class="dot" style="--i:2"></span>
+              INSERT COIN
+            </p>
+            <p class="emu-loading-game">{{ displayName }}</p>
+            <p class="emu-loading-sub">{{ loadingSub }}</p>
+            <button v-if="loadingSlow" class="btn btn-sm emu-loading-retry" @click="reloadPage">长时间未加载，点此刷新</button>
           </div>
-          <!-- Mute badge: auto-start is always muted to bypass browser autoplay
-               policy; this chip lets the user opt in to audio with a tap. -->
-          <button v-if="remoteStreamActive && isMuted" class="unmute-chip" @click="unmuteRemote">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/></svg>
-            点击取消静音
-          </button>
-        </div>
 
-        <div v-else-if="fatalError" class="emu-error">
-          <div class="error-card">
-            <p>{{ fatalError }}</p>
-            <button class="btn btn-primary" @click="goBack">返回列表</button>
+          <!-- Virtual pad: MUST be inside .emu-frame so it survives fullscreen
+              (browser hides everything outside the fullscreen element). -->
+          <VirtualGamepad
+            v-if="(rom && !isGuestMode) || (isGuestMode && canGuestPlay)"
+            :platform="romMeta?.platform"
+            :on-button="guestButtonInterceptor"
+            :landscape="isRotated"
+          />
+        </div>
+        <!-- Floating toggle button for overlay visibility -->
+        <button v-if="!showOverlay && (romMeta || fatalError || isGuestMode)" class="overlay-toggle-btn"
+          :class="{ 'overlay-toggle-btn--rotated': isRotated }" @click="showOverlay = true" title="显示控制栏 (H)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        <Transition name="hint">
+          <div v-if="showRotateHint" class="rotate-hint" @click="onRotateHint">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="2" width="16" height="20" rx="2" />
+              <path d="M12 18h.01" />
+            </svg>
+            横屏体验更佳
           </div>
-        </div>
+        </Transition>
 
-        <div v-else class="emu-loading">
-          <div class="loading-stack">
-            <div class="loading-glow"></div>
-            <div class="spinner"></div>
-          </div>
-          <p class="emu-loading-title">
-            <span class="dot" style="--i:0"></span><span class="dot" style="--i:1"></span><span class="dot" style="--i:2"></span>
-            INSERT COIN
-          </p>
-          <p class="emu-loading-game">{{ displayName }}</p>
-          <p class="emu-loading-sub">{{ loadingSub }}</p>
-          <button v-if="loadingSlow" class="btn btn-sm emu-loading-retry" @click="reloadPage">长时间未加载，点此刷新</button>
-        </div>
+        <Transition name="hint">
+          <div v-if="toastText" class="toast">{{ toastText }}</div>
+        </Transition>
 
-        <!-- Virtual pad: MUST be inside .emu-frame so it survives fullscreen
-             (browser hides everything outside the fullscreen element). -->
-        <VirtualGamepad
-          v-if="(rom && !isGuestMode) || (isGuestMode && canGuestPlay)"
-          :platform="romMeta?.platform"
-          :on-button="guestButtonInterceptor"
-          :landscape="isRotated"
-        />
-      </div>
+        <RoomPanel v-if="isRoomMode" :open="showRoom" :code="roomCode" :connected="signalConnected"
+          :is-host="isHostMode" :allow-play="canGuestPlay" :me-peer-id="signalMe?.peerId" :peers="signalPeers"
+          :chat="signalChat" @close="showRoom = false" @send="(t) => signal?.sendChat(t)" />
+
+        <InputSettings v-if="showInput" :platform="romMeta?.platform" @close="showInput = false" />
       </div><!-- /.emu-area-inner -->
-
-      <!-- Floating toggle button for overlay visibility -->
-      <button
-        v-if="!showOverlay && (romMeta || fatalError || isGuestMode)"
-        class="overlay-toggle-btn"
-        @click="showOverlay = true"
-        title="显示控制栏 (H)"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
-
-      <Transition name="hint">
-        <div v-if="showRotateHint" class="rotate-hint" @click="onRotateHint">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-          横屏体验更佳
-        </div>
-      </Transition>
-
-      <Transition name="hint">
-        <div v-if="toastText" class="toast">{{ toastText }}</div>
-      </Transition>
-
-      <RoomPanel v-if="isRoomMode" :open="showRoom" :code="roomCode" :connected="signalConnected" :is-host="isHostMode"
-        :allow-play="canGuestPlay" :me-peer-id="signalMe?.peerId" :peers="signalPeers" :chat="signalChat"
-        @close="showRoom = false" @send="(t) => signal?.sendChat(t)" />
-
-      <InputSettings v-if="showInput" :platform="romMeta?.platform" @close="showInput = false" />
     </div>
 
   </div>
@@ -1130,6 +1129,11 @@ onBeforeUnmount(() => {
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   opacity: 0.4;
+}
+/* When CSS rotation is active, the button is behind the rotated area —
+   give it a higher z-index so it's always on top */
+.overlay-toggle-btn--rotated {
+  z-index: 1000;
 }
 .overlay-toggle-btn:hover {
   background: rgba(40, 40, 45, 0.95);
