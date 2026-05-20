@@ -465,17 +465,8 @@ async function onFullscreen() {
     return
   }
 
-  // For mobile: use CSS rotation as the primary landscape approach
-  // (Screen Orientation API lock is unreliable during fullscreen transitions)
-  // NOTE: Do NOT auto-rotate on fullscreen — let the browser handle orientation
-  // naturally. Fullscreen mode manages its own viewport.
-  if (window.innerWidth < 768) {
-    isRotated.value = true
-    // Still try API lock as a bonus (may work on some Android browsers)
-    if (screen.orientation?.lock) {
-      screen.orientation.lock('landscape').catch(() => { })
-    }
-  }
+  // For mobile: do NOT auto-rotate on fullscreen — let the user manually
+  // trigger landscape via the rotate button in the control bar
 
   try {
     await el.requestFullscreen()
@@ -1081,7 +1072,8 @@ onBeforeUnmount(() => {
 }
 
 .rotate-hint, .toast {
-  position: fixed;
+  position: absolute;
+  top: calc(48px + 10px);
   left: 50%;
   transform: translateX(-50%);
   padding: 9px 16px;
@@ -1094,13 +1086,20 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(255,255,255,0.08);
   z-index: 100;
 }
-.rotate-hint { bottom: 90px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.rotate-hint { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .rotate-hint svg { animation: rotPhone 1.8s ease-in-out infinite; }
 @keyframes rotPhone {
   0%, 100% { transform: rotate(0); }
   50%      { transform: rotate(90deg); }
 }
-.toast { bottom: 60px; }
+.toast { top: calc(48px + 50px); }
+/* In fullscreen, use a safe top margin so hints appear below the control bar */
+.emu-area:fullscreen .rotate-hint,
+.emu-area:-webkit-full-screen .rotate-hint,
+.emu-area:fullscreen .toast,
+.emu-area:-webkit-full-screen .toast {
+  top: calc(56px + 10px) !important;
+}
 
 /* Floating overlay toggle button */
 .overlay-toggle-btn {

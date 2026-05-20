@@ -85,9 +85,9 @@ const showRotate = computed(() => {
   gap: 8px;
   padding:
     calc(10px + env(safe-area-inset-top))
-    calc(14px + env(safe-area-inset-right))
+    calc(20px + env(safe-area-inset-right))
     10px
-    calc(14px + env(safe-area-inset-left));
+    calc(20px + env(safe-area-inset-left));
   background: var(--b-bg);
   color: var(--b-text);
 }

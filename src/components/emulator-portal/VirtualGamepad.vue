@@ -485,9 +485,9 @@ function onDpadEnd(e) {
   align-items: end;
   padding:
     14px
-    calc(16px + env(safe-area-inset-right))
+    calc(34px + env(safe-area-inset-right))
     calc(14px + env(safe-area-inset-bottom))
-    calc(16px + env(safe-area-inset-left));
+    calc(34px + env(safe-area-inset-left));
   gap: 12px;
   touch-action: none;
   -webkit-user-select: none;
