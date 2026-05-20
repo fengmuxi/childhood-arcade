@@ -78,7 +78,7 @@ function readCookie(c) {
   return null
 }
 function setCookie(c, token, expiresAt) {
-  const isProd = process.env.NODE_ENV === 'production'
+  // const isProd = process.env.NODE_ENV === 'production'
   const maxAge = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
   const attrs = [
     `${COOKIE_NAME}=${token}`,
@@ -87,7 +87,7 @@ function setCookie(c, token, expiresAt) {
     'SameSite=Lax',
     `Max-Age=${maxAge}`,
   ]
-  if (isProd) attrs.push('Secure')
+  // if (isProd) attrs.push('Secure')
   c.header('Set-Cookie', attrs.join('; '))
 }
 function clearCookie(c) {

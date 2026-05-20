@@ -1,7 +1,7 @@
 <template>
   <div class="player-page">
     <GameOverlay
-      v-if="rom || fatalError || isGuestMode"
+      v-if="(romMeta || fatalError || isGuestMode) && showOverlay"
       :title="displayName"
       :platform="platformInfo"
       :core-name="coreDisplayName[platformInfo.core]"
@@ -11,6 +11,7 @@
       @keys="showInput = true"
       @save-state="onSaveState"
       @load-state="onLoadState"
+      @toggle-overlay="showOverlay = false"
     >
       <template #extras>
         <!-- Version switcher: only when this game has multi-version siblings -->
@@ -102,6 +103,18 @@
       </div>
     </div>
 
+    <!-- Floating toggle button for overlay visibility -->
+    <button
+      v-if="!showOverlay && (romMeta || fatalError || isGuestMode)"
+      class="overlay-toggle-btn"
+      @click="showOverlay = true"
+      title="显示控制栏 (H)"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
+
     <Transition name="hint">
       <div v-if="showRotateHint" class="rotate-hint" @click="showRotateHint = false">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/></svg>
@@ -168,6 +181,7 @@ const remoteVideoRef = ref(null)
 const showRotateHint = ref(false)
 const showInput = ref(false)
 const showRoom = ref(false)
+const showOverlay = ref(true)
 const toastText = ref('')
 const fatalError = ref(null)
 const romMeta = ref(null)
@@ -450,6 +464,9 @@ function showToast(text) {
 
 function onKeyDown(e) {
   if (e.key === 'Escape' && !document.fullscreenElement) goBack()
+  if (e.key.toLowerCase() === 'h' && (rom.value || fatalError.value || isGuestMode.value)) {
+    showOverlay.value = !showOverlay.value
+  }
 }
 
 // Fires when the remote video element actually has decoded frames on screen
@@ -994,6 +1011,40 @@ onBeforeUnmount(() => {
   50%      { transform: rotate(90deg); }
 }
 .toast { bottom: 60px; }
+
+/* Floating overlay toggle button */
+.overlay-toggle-btn {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 18, 20, 0.85);
+  color: rgba(245, 245, 247, 0.7);
+  cursor: pointer;
+  z-index: 50;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  opacity: 0.4;
+}
+.overlay-toggle-btn:hover {
+  background: rgba(40, 40, 45, 0.95);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #F5F5F7;
+  opacity: 1;
+  transform: translateX(-50%) scale(1.05);
+}
+.overlay-toggle-btn:active {
+  transform: translateX(-50%) scale(0.95);
+}
 
 .hint-enter-active, .hint-leave-active {
   transition: opacity 0.25s var(--ease-out), transform 0.25s var(--ease-out);

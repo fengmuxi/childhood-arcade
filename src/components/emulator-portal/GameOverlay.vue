@@ -25,6 +25,10 @@
     <button class="bar-btn bar-btn-keys" @click="$emit('keys')" aria-label="按键设置" title="按键设置">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>
     </button>
+    <button class="bar-btn bar-btn-show" @click="$emit('toggle-overlay')" aria-label="隐藏控制栏" title="隐藏控制栏 (H)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      <span class="bar-btn-label">收起</span>
+    </button>
     <button v-if="canFullscreen" class="bar-btn bar-btn-accent" @click="$emit('fullscreen')" aria-label="全屏">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
       <span class="bar-btn-label">全屏</span>
@@ -33,18 +37,21 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 defineProps({
   title: String,
   platform: { type: Object, required: true },
   coreName: String,
   canSave: { type: Boolean, default: true },
 })
-defineEmits(['back', 'fullscreen', 'keys', 'save-state', 'load-state'])
+defineEmits(['back', 'fullscreen', 'keys', 'save-state', 'load-state', 'toggle-overlay'])
 
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-const hasFs = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled)
-const canFullscreen = hasFs && !isIOS
+const canFullscreen = computed(() => {
+  const hasFs = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled)
+  return hasFs && !isIOS
+})
 </script>
 
 <style scoped>
@@ -61,6 +68,8 @@ const canFullscreen = hasFs && !isIOS
   /* Always visible — takes its own row in the .player-page flex column, so
      the canvas below sizes itself to the remaining viewport. */
   flex-shrink: 0;
+  position: relative;
+  z-index: 40;
 
   display: flex;
   align-items: center;
@@ -169,6 +178,16 @@ const canFullscreen = hasFs && !isIOS
 }
 .bar-btn-accent:hover {
   background: color-mix(in srgb, var(--accent) 32%, transparent);
+  color: #fff;
+}
+.bar-btn-show {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.bar-btn-show:hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.28);
   color: #fff;
 }
 
