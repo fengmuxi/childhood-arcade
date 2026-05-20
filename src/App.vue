@@ -9,7 +9,7 @@
       </Transition>
     </router-view>
     <footer v-if="showChrome" class="app-footer">
-      <span>童年游戏厅 · 作者 YiZe</span>
+      <span>童年游戏厅</span>
       <span class="dot">·</span>
       <span class="mono">v1.0</span>
     </footer>

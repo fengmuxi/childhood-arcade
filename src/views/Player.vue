@@ -1,45 +1,46 @@
 <template>
-  <div class="player-page" :class="{ 'player-page--rotated': isRotated }">
-    <GameOverlay
-      v-if="(romMeta || fatalError || isGuestMode) && showOverlay"
-      :title="displayName"
-      :platform="platformInfo"
-      :core-name="coreDisplayName[platformInfo.core]"
-      :can-save="isAuthed && !isGuestMode"
-      @back="goBack"
-      @fullscreen="onFullscreen"
-      @keys="showInput = true"
-      @save-state="onSaveState"
-      @load-state="onLoadState"
-      @toggle-overlay="showOverlay = false"
-      @rotate="onRotateHint"
-    >
-      <template #extras>
-        <!-- Version switcher: only when this game has multi-version siblings -->
-        <div v-if="siblings.length > 1" class="ver-switch" @click.stop>
-          <button class="ver-btn" @click="versionMenuOpen = !versionMenuOpen">
-            <span class="ver-cur">{{ currentVersionLabel }}</span>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div v-if="versionMenuOpen" class="ver-menu">
-            <button
-              v-for="v in siblings"
-              :key="v.id"
-              class="ver-item"
-              :class="{ active: v.id === romMeta?.id }"
-              @click="switchVersion(v)"
-            >{{ v.id === (romMeta?.parentRomId ?? romMeta?.id) ? '原版' : (v.versionLabel || '变体') }}</button>
+  <div class="player-page">
+    <div class="emu-area" ref="frameRef">
+      <div class="emu-area-inner" :class="{ 'emu-area-inner--rotated': isRotated }">
+      <GameOverlay
+        v-if="(romMeta || fatalError || isGuestMode) && showOverlay"
+        :title="displayName"
+        :platform="platformInfo"
+        :core-name="coreDisplayName[platformInfo.core]"
+        :can-save="isAuthed && !isGuestMode"
+        @back="goBack"
+        @fullscreen="onFullscreen"
+        @keys="showInput = true"
+        @save-state="onSaveState"
+        @load-state="onLoadState"
+        @toggle-overlay="showOverlay = false"
+        @rotate="onRotateHint"
+      >
+        <template #extras>
+          <!-- Version switcher: only when this game has multi-version siblings -->
+          <div v-if="siblings.length > 1" class="ver-switch" @click.stop>
+            <button class="ver-btn" @click="versionMenuOpen = !versionMenuOpen">
+              <span class="ver-cur">{{ currentVersionLabel }}</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div v-if="versionMenuOpen" class="ver-menu">
+              <button
+                v-for="v in siblings"
+                :key="v.id"
+                class="ver-item"
+                :class="{ active: v.id === romMeta?.id }"
+                @click="switchVersion(v)"
+              >{{ v.id === (romMeta?.parentRomId ?? romMeta?.id) ? '原版' : (v.versionLabel || '变体') }}</button>
+            </div>
           </div>
-        </div>
 
-        <button v-if="isRoomMode" class="room-chip" :class="{ active: showRoom }" @click="showRoom = !showRoom" title="房间">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-          <span class="chip-count">{{ Object.keys(signalPeers).length }}</span>
-        </button>
-      </template>
-    </GameOverlay>
+          <button v-if="isRoomMode" class="room-chip" :class="{ active: showRoom }" @click="showRoom = !showRoom" title="房间">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            <span class="chip-count">{{ Object.keys(signalPeers).length }}</span>
+          </button>
+        </template>
+      </GameOverlay>
 
-    <div class="emu-area">
       <div class="emu-frame">
         <!-- Host / solo: real Nostalgist emulator.
              Only render when we KNOW we're solo or the host. If we're in a
@@ -101,54 +102,47 @@
           <p class="emu-loading-sub">{{ loadingSub }}</p>
           <button v-if="loadingSlow" class="btn btn-sm emu-loading-retry" @click="reloadPage">长时间未加载，点此刷新</button>
         </div>
+
+        <!-- Virtual pad: MUST be inside .emu-frame so it survives fullscreen
+             (browser hides everything outside the fullscreen element). -->
+        <VirtualGamepad
+          v-if="(rom && !isGuestMode) || (isGuestMode && canGuestPlay)"
+          :platform="romMeta?.platform"
+          :on-button="guestButtonInterceptor"
+        />
       </div>
+      </div><!-- /.emu-area-inner -->
+
+      <!-- Floating toggle button for overlay visibility -->
+      <button
+        v-if="!showOverlay && (romMeta || fatalError || isGuestMode)"
+        class="overlay-toggle-btn"
+        @click="showOverlay = true"
+        title="显示控制栏 (H)"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
+      <Transition name="hint">
+        <div v-if="showRotateHint" class="rotate-hint" @click="onRotateHint">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+          横屏体验更佳
+        </div>
+      </Transition>
+
+      <Transition name="hint">
+        <div v-if="toastText" class="toast">{{ toastText }}</div>
+      </Transition>
+
+      <RoomPanel v-if="isRoomMode" :open="showRoom" :code="roomCode" :connected="signalConnected" :is-host="isHostMode"
+        :allow-play="canGuestPlay" :me-peer-id="signalMe?.peerId" :peers="signalPeers" :chat="signalChat"
+        @close="showRoom = false" @send="(t) => signal?.sendChat(t)" />
+
+      <InputSettings v-if="showInput" :platform="romMeta?.platform" @close="showInput = false" />
     </div>
 
-    <!-- Floating toggle button for overlay visibility -->
-    <button
-      v-if="!showOverlay && (romMeta || fatalError || isGuestMode)"
-      class="overlay-toggle-btn"
-      @click="showOverlay = true"
-      title="显示控制栏 (H)"
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="6 9 12 15 18 9"/>
-      </svg>
-    </button>
-
-    <Transition name="hint">
-      <div v-if="showRotateHint" class="rotate-hint" @click="onRotateHint">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-        横屏体验更佳
-      </div>
-    </Transition>
-
-    <Transition name="hint">
-      <div v-if="toastText" class="toast">{{ toastText }}</div>
-    </Transition>
-
-    <!-- Virtual pad: host/solo on touch devices, or guest that's allowed to play -->
-    <VirtualGamepad
-      v-if="(rom && !isGuestMode) || (isGuestMode && canGuestPlay)"
-      :platform="romMeta?.platform"
-      :on-button="guestButtonInterceptor"
-    />
-
-    <RoomPanel
-      v-if="isRoomMode"
-      :open="showRoom"
-      :code="roomCode"
-      :connected="signalConnected"
-      :is-host="isHostMode"
-      :allow-play="canGuestPlay"
-      :me-peer-id="signalMe?.peerId"
-      :peers="signalPeers"
-      :chat="signalChat"
-      @close="showRoom = false"
-      @send="(t) => signal?.sendChat(t)"
-    />
-
-    <InputSettings v-if="showInput" :platform="romMeta?.platform" @close="showInput = false" />
   </div>
 </template>
 
@@ -178,6 +172,7 @@ const { isAuthed } = useAuth()
 
 // -- State --
 const portalRef = ref(null)
+const frameRef = ref(null)
 const remoteVideoRef = ref(null)
 const showRotateHint = ref(false)
 const isRotated = ref(false)
@@ -458,7 +453,51 @@ function goBack() {
     router.push('/')
   }
 }
-function onFullscreen() { portalRef.value?.toggleFullscreen() }
+async function onFullscreen() {
+  const el = frameRef.value
+  if (!el) return
+  if (document.fullscreenElement) {
+    await document.exitFullscreen()
+    if (screen.orientation?.unlock) {
+      try { screen.orientation.unlock() } catch {}
+    }
+    isRotated.value = false
+    return
+  }
+
+  // For mobile: use CSS rotation as the primary landscape approach
+  // (Screen Orientation API lock is unreliable during fullscreen transitions)
+  if (window.innerWidth < 768) {
+    isRotated.value = true
+    // Still try API lock as a bonus (may work on some Android browsers)
+    if (screen.orientation?.lock) {
+      screen.orientation.lock('landscape').catch(() => {})
+    }
+  }
+
+  try {
+    await el.requestFullscreen()
+  } catch {
+    try {
+      await el.webkitRequestFullscreen()
+    } catch {}
+  }
+}
+
+let relockTimer = null
+function onFullscreenChange() {
+  if (relockTimer) { clearTimeout(relockTimer); relockTimer = null }
+  if (document.fullscreenElement && screen.orientation?.lock && window.innerWidth < 768) {
+    // Re-attempt lock after fullscreen settles (belt-and-suspenders)
+    relockTimer = setTimeout(() => {
+      if (!document.fullscreenElement) return
+      screen.orientation.lock('landscape').catch(() => {})
+    }, 200)
+  } else if (!document.fullscreenElement) {
+    // Exited fullscreen — clear rotation
+    isRotated.value = false
+  }
+}
 function showToast(text) {
   toastText.value = text
   setTimeout(() => { toastText.value = '' }, 1600)
@@ -466,25 +505,26 @@ function showToast(text) {
 
 async function onRotateHint() {
   showRotateHint.value = false
-  // If already rotated, unlock orientation and restore
-  // if (isRotated.value) {
-  //   isRotated.value = false
-  //   if (screen.orientation?.unlock) {
-  //     try { screen.orientation.unlock() } catch {}
-  //   }
-  //   return
-  // }
-  // Try Screen Orientation API first (Chrome on Android, etc.)
-  // if (screen.orientation?.lock) {
-  //   try {
-  //     await screen.orientation.lock('landscape')
-  //     return
-  //   } catch {
-  //     // Fall through to CSS rotation
-  //   }
-  // }
-  // Fallback: rotate the entire page content via CSS
-  // isRotated.value = true
+  if (isRotated.value) {
+    isRotated.value = false
+    if (screen.orientation?.unlock) {
+      try { screen.orientation.unlock() } catch {}
+    }
+    return
+  }
+  if (window.innerWidth < 768) {
+    // On mobile, CSS rotation is more reliable
+    isRotated.value = true
+    return
+  }
+  // Desktop: try Screen Orientation API
+  if (screen.orientation?.lock) {
+    try {
+      await screen.orientation.lock('landscape')
+      return
+    } catch {}
+  }
+  isRotated.value = true
 }
 
 function onKeyDown(e) {
@@ -718,6 +758,7 @@ onMounted(() => {
     setTimeout(() => { showRotateHint.value = false }, 6000)
   }
   document.addEventListener('keydown', onKeyDown)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
   loadMeta()
   // If the emulator still hasn't booted after 30 s, surface a "long load" hint
   // so the user knows they can refresh instead of staring at a spinner.
@@ -731,6 +772,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeyDown)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('keydown', guestKeyHandler, true)
   document.removeEventListener('keyup', guestKeyHandler, true)
   if (slowTimer) { clearTimeout(slowTimer); slowTimer = null }
@@ -755,16 +797,6 @@ onBeforeUnmount(() => {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* CSS landscape rotation for devices that don't support Screen Orientation API */
-.player-page--rotated {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100vh;
-  height: 100vw;
-  /* Center and rotate to fill screen in landscape */
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%) rotate(90deg);
-}
 .player-page :deep(.portal-canvas) {
   -webkit-user-select: none;
   user-select: none;
@@ -774,14 +806,42 @@ onBeforeUnmount(() => {
 .emu-area {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  z-index: 1;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
-.emu-frame { width: 100%; height: 100%; position: relative; overflow: hidden; }
+.emu-area-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+/* CSS landscape rotation for devices that don't support Screen Orientation API */
+.emu-area-inner--rotated {
+  position: absolute;
+  /* Swap dimensions: make width = container height, height = container width */
+  width: 100vh;
+  height: 100vw;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
+  z-index: 999;
+}
+/* When in fullscreen, vh/vw match the fullscreen container dimensions */
+.emu-area-inner--rotated:fullscreen,
+.emu-area-inner--rotated:-webkit-full-screen {
+  position: absolute !important;
+  width: 100vh !important;
+  height: 100vw !important;
+  top: 50% !important; left: 50% !important;
+  transform: translate(-50%, -50%) rotate(90deg) !important;
+  transform-origin: center center !important;
+}
+.emu-frame { flex: 1; width: 100%; min-height: 0; position: relative; overflow: hidden; }
 
 .guest-view {
   position: absolute; inset: 0;
